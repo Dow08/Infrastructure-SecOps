@@ -1,0 +1,14 @@
+[Unit]
+Description=Hermes Extended API Dashboard
+After=network.target hermes-gateway.service
+
+[Service]
+Type=simple
+User=root
+Environment=HOME=/root
+ExecStart=/usr/local/bin/hermes dashboard
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

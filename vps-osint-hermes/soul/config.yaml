@@ -1,0 +1,12 @@
+model:
+  default: gemini-2.5-flash
+  provider: gemini
+  base_url: https://generativelanguage.googleapis.com/v1beta
+  name: gemini-2.5-flash
+agent:
+  reasoning_effort: low
+platforms:
+  api_server:
+    key: mon_token_securise_hermes
+display:
+  personality: concise

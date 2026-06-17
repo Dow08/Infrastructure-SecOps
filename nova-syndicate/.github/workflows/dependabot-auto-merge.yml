@@ -1,0 +1,65 @@
+name: 🤖 Dependabot Auto-Merge
+
+# Auto-merge les PRs de Dependabot pour les bumps PATCH et MINOR
+# Les MAJOR bumps restent en review manuelle
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+permissions:
+  pull-requests: write
+  contents: write
+
+jobs:
+  auto-merge:
+    name: Auto-merge safe Dependabot PRs
+    runs-on: ubuntu-latest
+    # Ne tourne que sur les PRs créées par Dependabot
+    if: github.event.pull_request.user.login == 'dependabot[bot]'
+
+    steps:
+      - name: 📋 Récupérer métadonnées Dependabot
+        id: metadata
+        uses: dependabot/fetch-metadata@v2
+        with:
+          github-token: "${{ secrets.GITHUB_TOKEN }}"
+
+      - name: 🔍 Afficher contexte
+        run: |
+          echo "Update type : ${{ steps.metadata.outputs.update-type }}"
+          echo "Dependency  : ${{ steps.metadata.outputs.dependency-names }}"
+          echo "Ecosystem   : ${{ steps.metadata.outputs.package-ecosystem }}"
+
+      # === AUTO-APPROVE PATCH + MINOR ===
+      - name: ✅ Approuver automatiquement (patch + minor)
+        if: |
+          steps.metadata.outputs.update-type == 'version-update:semver-patch' ||
+          steps.metadata.outputs.update-type == 'version-update:semver-minor'
+        run: gh pr review --approve "$PR_URL"
+        env:
+          PR_URL: ${{ github.event.pull_request.html_url }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      # === AUTO-MERGE PATCH + MINOR ===
+      - name: 🚀 Activer auto-merge (squash)
+        if: |
+          steps.metadata.outputs.update-type == 'version-update:semver-patch' ||
+          steps.metadata.outputs.update-type == 'version-update:semver-minor'
+        run: gh pr merge --auto --squash "$PR_URL"
+        env:
+          PR_URL: ${{ github.event.pull_request.html_url }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      # === COMMENTER LES MAJOR BUMPS pour review humaine ===
+      - name: ⚠️ Commenter les major bumps
+        if: steps.metadata.outputs.update-type == 'version-update:semver-major'
+        run: |
+          gh pr comment "$PR_URL" --body "🚨 **Major version bump détecté** pour \`${{ steps.metadata.outputs.dependency-names }}\`.
+
+          Cette mise à jour peut contenir des **breaking changes**. Review manuelle requise avant merge.
+
+          → Consulter le [changelog du package](${{ steps.metadata.outputs.dependency-name }}) avant de valider."
+        env:
+          PR_URL: ${{ github.event.pull_request.html_url }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}

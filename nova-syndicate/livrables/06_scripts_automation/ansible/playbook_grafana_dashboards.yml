@@ -1,0 +1,141 @@
+---
+# Playbook : import des dashboards Grafana communautaires
+# Importe les dashboards officiels Grafana.com et configure Loki/Prometheus
+# Usage : ansible-playbook -i inventory.ini playbook_grafana_dashboards.yml
+# Prereq : monitoring_server.yml + monitoring_agents.yml deployes
+
+- name: Import Grafana dashboards and configure datasources
+  hosts: observability_server
+  become: true
+  gather_facts: no
+
+  vars:
+    grafana_url: "http://localhost:{{ grafana_port }}"
+    grafana_user: admin
+    grafana_password: admin
+    # Dashboards Grafana.com IDs
+    dashboards:
+      - id: 1860
+        name: "Node Exporter Full"
+        datasource: Prometheus
+      - id: 7362
+        name: "MySQL Overview"
+        datasource: Prometheus
+      - id: 12708
+        name: "NGINX Prometheus Exporter"
+        datasource: Prometheus
+      - id: 13639
+        name: "Logs / App"
+        datasource: Loki
+
+  tasks:
+    - name: Wait for Grafana ready
+      uri:
+        url: "{{ grafana_url }}/api/health"
+        status_code: 200
+      register: gh
+      until: gh.status == 200
+      retries: 12
+      delay: 5
+
+    - name: Get datasource UIDs
+      uri:
+        url: "{{ grafana_url }}/api/datasources/name/{{ item }}"
+        user: "{{ grafana_user }}"
+        password: "{{ grafana_password }}"
+        force_basic_auth: yes
+      register: ds_results
+      loop:
+        - Prometheus
+        - Loki
+
+    - name: Set datasource UID variables
+      set_fact:
+        prometheus_uid: "{{ ds_results.results[0].json.uid }}"
+        loki_uid: "{{ ds_results.results[1].json.uid }}"
+
+    - name: Download dashboards from Grafana.com
+      get_url:
+        url: "https://grafana.com/api/dashboards/{{ item.id }}/revisions/latest/download"
+        dest: "/tmp/dashboard_{{ item.id }}.json"
+        mode: '0644'
+      loop: "{{ dashboards }}"
+
+    - name: Replace datasource UID placeholders
+      shell: |
+        DS_UID="{% raw %}{% endraw %}{{ prometheus_uid if item.datasource == 'Prometheus' else loki_uid }}"
+        DS_NAME="{{ item.datasource }}"
+        # Remplacer toutes les variantes connues de placeholder datasource
+        sed -i "s/\${DS_PROMETHEUS}/${DS_UID}/g" /tmp/dashboard_{{ item.id }}.json
+        sed -i "s/\${DS_LOKI}/${DS_UID}/g" /tmp/dashboard_{{ item.id }}.json
+        sed -i "s/\${datasource}/${DS_UID}/g" /tmp/dashboard_{{ item.id }}.json
+      loop: "{{ dashboards }}"
+      args:
+        executable: /bin/bash
+      changed_when: false
+
+    - name: Build dashboard import payload
+      shell: |
+        cat <<EOF
+        {
+          "dashboard": $(cat /tmp/dashboard_{{ item.id }}.json),
+          "overwrite": true,
+          "inputs": [
+            {
+              "name": "DS_PROMETHEUS",
+              "type": "datasource",
+              "pluginId": "prometheus",
+              "value": "{{ prometheus_uid }}"
+            },
+            {
+              "name": "DS_LOKI",
+              "type": "datasource",
+              "pluginId": "loki",
+              "value": "{{ loki_uid }}"
+            }
+          ],
+          "folderId": 0
+        }
+        EOF
+      register: import_payloads
+      loop: "{{ dashboards }}"
+
+    - name: Import dashboards via API
+      uri:
+        url: "{{ grafana_url }}/api/dashboards/import"
+        method: POST
+        user: "{{ grafana_user }}"
+        password: "{{ grafana_password }}"
+        force_basic_auth: yes
+        body: "{{ item.stdout }}"
+        body_format: json
+        status_code: [200, 412]  # 412 = already exists
+      loop: "{{ import_payloads.results }}"
+      loop_control:
+        label: "Dashboard {{ item.item.id }} ({{ item.item.name }})"
+
+    - name: Set Node Exporter Full as home dashboard
+      uri:
+        url: "{{ grafana_url }}/api/org/preferences"
+        method: PUT
+        user: "{{ grafana_user }}"
+        password: "{{ grafana_password }}"
+        force_basic_auth: yes
+        body_format: json
+        body:
+          theme: dark
+        status_code: 200
+
+    - name: Display import success
+      debug:
+        msg:
+          - "===== Dashboards Grafana importes ====="
+          - "Grafana : http://{{ monitoring_server_ip }}:{{ grafana_port }}"
+          - "Login   : admin / admin"
+          - "Dashboards disponibles :"
+          - "  - Node Exporter Full (metriques systeme x3 hosts)"
+          - "  - MySQL Overview (MariaDB DB-01)"
+          - "  - NGINX Exporter (nginx DB-01)"
+          - "  - Logs / App (logs via Loki)"
+          - "======================================"
+

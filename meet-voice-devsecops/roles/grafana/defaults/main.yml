@@ -1,0 +1,10 @@
+---
+grafana_version: "10.4.0"
+grafana_port: 3000
+grafana_user: "grafana"
+grafana_group: "grafana"
+grafana_data_dir: "/var/lib/grafana"
+grafana_logs_dir: "/var/log/grafana"
+grafana_config_dir: "/etc/grafana"
+grafana_admin_user: "admin"
+grafana_admin_password: "MonitoringSecure2026!"  # ⚠️ À changer en production ou via Ansible Vault

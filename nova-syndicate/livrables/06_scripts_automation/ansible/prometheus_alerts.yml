@@ -1,0 +1,134 @@
+---
+# Playbook : rÃ¨gles d'alerting Prometheus + Alertmanager
+# Configure des alertes essentielles (CPU, RAM, disk, services down)
+# Usage : ansible-playbook -i inventory.ini prometheus_alerts.yml
+# PrÃ©-requis : playbook_monitoring_server.yml deja deploye
+# Duree : 5 min
+
+- name: Configure Prometheus alerting rules
+  hosts: observability_server
+  become: true
+
+  vars:
+    prometheus_dir: /etc/prometheus
+
+  tasks:
+    - name: Create alerts rules file
+      copy:
+        dest: "{{ prometheus_dir }}/alerts.yml"
+        content: |
+          groups:
+            - name: infrastructure
+              interval: 30s
+              rules:
+                - alert: HostDown
+                  expr: up == 0
+                  for: 1m
+                  labels:
+                    severity: critical
+                  annotations:
+                    summary: "Hote {{ '{{' }} $labels.instance {{ '}}' }} injoignable"
+                    description: "{{ '{{' }} $labels.instance {{ '}}' }} n'a pas repondu au scrape depuis 1 minute"
+
+                - alert: HighCPULoad
+                  expr: 100 - (avg by(instance) (irate(node_cpu_seconds_total{mode="idle"}[5m])) * 100) > 85
+                  for: 5m
+                  labels:
+                    severity: warning
+                  annotations:
+                    summary: "CPU eleve sur {{ '{{' }} $labels.instance {{ '}}' }}"
+                    description: "CPU > 85% depuis 5 min ({{ '{{' }} $value {{ '}}' }}%)"
+
+                - alert: HighMemoryUsage
+                  expr: (1 - (node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes)) * 100 > 90
+                  for: 5m
+                  labels:
+                    severity: warning
+                  annotations:
+                    summary: "RAM elevee sur {{ '{{' }} $labels.instance {{ '}}' }}"
+                    description: "RAM > 90% depuis 5 min ({{ '{{' }} $value {{ '}}' }}%)"
+
+                - alert: DiskSpaceLow
+                  expr: (node_filesystem_avail_bytes{mountpoint="/"} / node_filesystem_size_bytes{mountpoint="/"}) * 100 < 15
+                  for: 2m
+                  labels:
+                    severity: critical
+                  annotations:
+                    summary: "Disque faible sur {{ '{{' }} $labels.instance {{ '}}' }}"
+                    description: "/ < 15% libre ({{ '{{' }} $value {{ '}}' }}%)"
+
+            - name: services
+              interval: 30s
+              rules:
+                - alert: MariaDBDown
+                  expr: mysql_up == 0
+                  for: 1m
+                  labels:
+                    severity: critical
+                  annotations:
+                    summary: "MariaDB DOWN sur {{ '{{' }} $labels.instance {{ '}}' }}"
+
+                - alert: NginxDown
+                  expr: nginx_up == 0
+                  for: 1m
+                  labels:
+                    severity: critical
+                  annotations:
+                    summary: "Nginx DOWN sur {{ '{{' }} $labels.instance {{ '}}' }}"
+
+                - alert: ManyConnections
+                  expr: mysql_global_status_threads_connected > 100
+                  for: 5m
+                  labels:
+                    severity: warning
+                  annotations:
+                    summary: "MariaDB > 100 connexions actives"
+
+            - name: security
+              interval: 1m
+              rules:
+                - alert: SSHBruteForce
+                  expr: rate(node_systemd_unit_state{name="ssh.service", state="active"}[5m]) > 0 and ON(instance) rate(node_systemd_unit_state{name="fail2ban.service", state="active"}[5m]) == 0
+                  for: 10m
+                  labels:
+                    severity: warning
+                  annotations:
+                    summary: "fail2ban arrete sur hote SSH actif {{ '{{' }} $labels.instance {{ '}}' }}"
+        owner: prometheus
+        group: prometheus
+        mode: '0644'
+
+    - name: Update Prometheus config to load alerts
+      blockinfile:
+        path: "{{ prometheus_dir }}/prometheus.yml"
+        marker: "# {mark} ANSIBLE MANAGED - ALERTS"
+        insertafter: "evaluation_interval:"
+        block: |2
+
+          rule_files:
+            - "alerts.yml"
+
+    - name: Restart Prometheus to load alerts (systemctl plutot que reload API qui requiert --web.enable-lifecycle)
+      systemd:
+        name: prometheus
+        state: restarted
+
+    - name: Wait for Prometheus to be ready
+      uri:
+        url: "http://localhost:9090/-/ready"
+        status_code: 200
+      register: prom_ready
+      until: prom_ready.status == 200
+      retries: 10
+      delay: 2
+
+    - name: Verify alerts loaded
+      uri:
+        url: "http://localhost:9090/api/v1/rules"
+        return_content: yes
+      register: rules_check
+
+    - name: Display alert rules count
+      debug:
+        msg: "Regles d'alerting chargees - voir http://10.1.10.40:9090/alerts"
+

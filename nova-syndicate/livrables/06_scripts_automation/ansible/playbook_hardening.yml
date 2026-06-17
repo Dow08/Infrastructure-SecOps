@@ -1,0 +1,193 @@
+---
+# Playbook : Hardening securite sur les 3 VMs working
+# Fail2ban + auto-updates + SSH hardening minimal (sans casser nos services)
+# Usage : ansible-playbook -i inventory.ini playbook_hardening.yml
+# Duree : 5-10 min
+
+- name: Hardening de base sur tous les hosts Lyon
+  hosts: lyon
+  become: true
+  gather_facts: yes
+
+  vars:
+    # IPs autorisees pour SSH (toujours)
+    ssh_allowed_from:
+      - 10.1.10.254    # Proxmox host (admin Ansible)
+      - 172.16.100.20  # Bastion
+
+  tasks:
+    # === MISE A JOUR ET PAQUETS SECURITE ===
+    - name: Update apt cache
+      apt:
+        update_cache: yes
+        cache_valid_time: 3600
+
+    - name: Install security toolkit
+      apt:
+        name:
+          - fail2ban
+          - unattended-upgrades
+          - apt-listchanges
+          - rsyslog
+          - logrotate
+        state: present
+
+    # === FAIL2BAN ===
+    - name: Configure fail2ban defaults
+      copy:
+        dest: /etc/fail2ban/jail.d/00-defaults.local
+        content: |
+          [DEFAULT]
+          # Bantime initial 1h, augmente progressivement (recidive)
+          bantime = 3600
+          bantime.increment = true
+          bantime.factor = 2
+          bantime.maxtime = 86400  # 24h max
+          findtime = 600
+          maxretry = 5
+          # Email alerts (configurable)
+          destemail = security@nova.local
+          sender = fail2ban@{{ inventory_hostname }}
+          # IPs jamais bannies
+          ignoreip = 127.0.0.1/8 10.1.10.254 172.16.100.20
+
+    - name: Enable SSH jail
+      copy:
+        dest: /etc/fail2ban/jail.d/sshd.local
+        content: |
+          [sshd]
+          enabled = true
+          port = ssh
+          filter = sshd
+          logpath = /var/log/auth.log
+          maxretry = 5
+          findtime = 600
+          bantime = 3600
+
+    - name: Enable nginx-noscript jail (DB-01 only)
+      copy:
+        dest: /etc/fail2ban/jail.d/nginx-noscript.local
+        content: |
+          [nginx-noscript]
+          enabled = true
+          port = http,https
+          filter = nginx-noscript
+          logpath = /var/log/nginx/*access.log
+          maxretry = 3
+          findtime = 300
+          bantime = 86400
+      when: "'nginx_hosts' in group_names"
+
+    - name: Enable and start fail2ban
+      systemd:
+        name: fail2ban
+        enabled: yes
+        state: restarted
+
+    # === AUTO UPDATES ===
+    - name: Configure auto-updates schedule
+      copy:
+        dest: /etc/apt/apt.conf.d/20auto-upgrades
+        content: |
+          APT::Periodic::Update-Package-Lists "1";
+          APT::Periodic::Unattended-Upgrade "1";
+          APT::Periodic::Download-Upgradeable-Packages "1";
+          APT::Periodic::AutocleanInterval "7";
+
+    - name: Configure unattended-upgrades to keep only security
+      copy:
+        dest: /etc/apt/apt.conf.d/50unattended-upgrades.local
+        content: |
+          Unattended-Upgrade::Allowed-Origins {
+            "${distro_id}:${distro_codename}-security";
+            "${distro_id}ESMApps:${distro_codename}-apps-security";
+            "${distro_id}ESM:${distro_codename}-infra-security";
+          };
+          Unattended-Upgrade::AutoFixInterruptedDpkg "true";
+          Unattended-Upgrade::MinimalSteps "true";
+          Unattended-Upgrade::Remove-Unused-Dependencies "true";
+          Unattended-Upgrade::Automatic-Reboot "false";
+
+    # === SSH HARDENING ===
+    # NOTE : on garde PermitRootLogin yes pour les besoins du PoC (tunnel root@proxmox)
+    # En production : decommenter pour le passer en "no"
+    - name: SSH config - disable empty passwords
+      lineinfile:
+        path: /etc/ssh/sshd_config
+        regexp: '^#?PermitEmptyPasswords'
+        line: 'PermitEmptyPasswords no'
+      notify: restart ssh
+
+    - name: SSH config - disable X11 forwarding
+      lineinfile:
+        path: /etc/ssh/sshd_config
+        regexp: '^#?X11Forwarding'
+        line: 'X11Forwarding no'
+      notify: restart ssh
+
+    - name: SSH config - LoginGraceTime 30s
+      lineinfile:
+        path: /etc/ssh/sshd_config
+        regexp: '^#?LoginGraceTime'
+        line: 'LoginGraceTime 30'
+      notify: restart ssh
+
+    - name: SSH config - MaxAuthTries 3
+      lineinfile:
+        path: /etc/ssh/sshd_config
+        regexp: '^#?MaxAuthTries'
+        line: 'MaxAuthTries 3'
+      notify: restart ssh
+
+    # === KERNEL HARDENING ===
+    - name: Sysctl - network hardening
+      copy:
+        dest: /etc/sysctl.d/99-nova-security.conf
+        content: |
+          # Nova Syndicate hardening - sysctl
+          # Anti spoofing
+          net.ipv4.conf.all.rp_filter = 1
+          net.ipv4.conf.default.rp_filter = 1
+          # ICMP redirect
+          net.ipv4.conf.all.accept_redirects = 0
+          net.ipv4.conf.default.accept_redirects = 0
+          net.ipv4.conf.all.secure_redirects = 0
+          # SYN cookies
+          net.ipv4.tcp_syncookies = 1
+          # Ignore ICMP broadcast
+          net.ipv4.icmp_echo_ignore_broadcasts = 1
+          # Disable source routing
+          net.ipv4.conf.all.accept_source_route = 0
+          net.ipv4.conf.default.accept_source_route = 0
+          # Log martians
+          net.ipv4.conf.all.log_martians = 1
+          # IPv6 disabled (pas utilise dans notre archi)
+          # net.ipv6.conf.all.disable_ipv6 = 1
+      notify: reload sysctl
+
+    # === LOGGING ===
+    - name: Ensure rsyslog enabled
+      systemd:
+        name: rsyslog
+        enabled: yes
+        state: started
+
+    # === STATUT FINAL ===
+    - name: Verification fail2ban
+      command: fail2ban-client status
+      register: f2b_status
+      changed_when: false
+
+    - name: Display fail2ban jails
+      debug:
+        msg: "{{ f2b_status.stdout_lines }}"
+
+  handlers:
+    - name: restart ssh
+      systemd:
+        name: ssh
+        state: restarted
+
+    - name: reload sysctl
+      command: sysctl -p /etc/sysctl.d/99-nova-security.conf
+

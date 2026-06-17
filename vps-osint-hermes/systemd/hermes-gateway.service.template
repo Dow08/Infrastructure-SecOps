@@ -1,0 +1,14 @@
+[Unit]
+Description=Hermes Gateway Backend
+After=network.target
+
+[Service]
+Type=simple
+User=root
+Environment=HOME=/root
+ExecStart=/usr/local/bin/hermes gateway run --replace
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

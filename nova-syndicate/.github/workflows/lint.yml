@@ -1,0 +1,117 @@
+name: 🧹 Code Quality
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  # === YAML LINT ===
+  yamllint:
+    name: 📄 YAML Lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run yamllint
+        uses: ibiqlik/action-yamllint@v3
+        with:
+          config_data: |
+            extends: default
+            rules:
+              # Lignes trop longues : warning, max 200 chars
+              line-length:
+                max: 200
+                level: warning
+              # Espaces autour des commentaires
+              comments:
+                min-spaces-from-content: 1
+                level: warning
+              # Truthy : warning seulement (sinon True/False fail)
+              truthy:
+                allowed-values: ['true', 'false', 'yes', 'no']
+                check-keys: false
+                level: warning
+              # Indentation 2 espaces
+              indentation:
+                spaces: 2
+                indent-sequences: consistent
+                level: warning
+              # Lignes vides : warning seulement (max 2 consécutives, 1 à la fin OK)
+              empty-lines:
+                max: 2
+                max-start: 0
+                max-end: 1
+                level: warning
+              # Document start "---" : warning seulement
+              document-start:
+                level: warning
+              # Trailing spaces : warning seulement
+              trailing-spaces:
+                level: warning
+              # Newline à la fin du fichier : warning seulement
+              new-line-at-end-of-file:
+                level: warning
+              # Brackets et braces : warning
+              brackets:
+                level: warning
+              braces:
+                level: warning
+              # Désactiver complètement les rules trop strictes pour notre cas
+              empty-values: disable
+              key-duplicates: enable  # On garde celle-ci, c'est un vrai bug
+              octal-values: disable
+          file_or_dir: '.'
+          strict: false  # Warnings autorisés, seuls les errors font fail
+
+  # === MARKDOWN LINT ===
+  markdownlint:
+    name: 📝 Markdown Lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run markdownlint
+        uses: DavidAnson/markdownlint-cli2-action@v23
+        with:
+          globs: '**/*.md'
+          config: |
+            {
+              "default": true,
+              "MD013": false,
+              "MD033": false,
+              "MD041": false,
+              "MD024": { "siblings_only": true },
+              "MD036": false
+            }
+        continue-on-error: true
+
+  # === SHELLCHECK — Validation scripts bash ===
+  shellcheck:
+    name: 🐚 ShellCheck
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run ShellCheck
+        uses: ludeeus/action-shellcheck@master
+        with:
+          severity: warning
+          ignore_paths: |
+            Build
+        continue-on-error: true
+
+  # === TERRAFORM FMT — Formatage Terraform ===
+  terraform-fmt:
+    name: 🏗️ Terraform Format Check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v4
+      - name: Terraform fmt check
+        run: |
+          if [ -d "Build/terraform" ]; then
+            cd Build/terraform
+            terraform fmt -check -recursive -diff || echo "::warning::Terraform files need formatting (run 'terraform fmt')"
+          fi
+        continue-on-error: true

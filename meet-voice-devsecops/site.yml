@@ -1,0 +1,49 @@
+
+---
+# ============================================
+# PLAYBOOK PRINCIPAL — Monitoring Infrastructure
+# ============================================
+
+# --- Node Exporter sur tous les serveurs cibles ---
+- name: "📦 Déploiement Node Exporter"
+  hosts: monitored_servers
+  become: true
+  roles:
+    - node_exporter
+
+# --- Prometheus sur le serveur central ---
+- name: "📊 Déploiement Prometheus"
+  hosts: monitoring_server
+  become: true
+  roles:
+    - prometheus
+
+- name: "🌐 Déploiement Nginx (Reverse Proxy)"
+  hosts: monitoring_server
+  become: true
+  roles:
+    - nginx
+
+- name: "📈 Déploiement Grafana"
+  hosts: monitoring_server
+  become: true
+  roles:
+    - grafana
+
+- name: "🔔 Déploiement Alertmanager"
+  hosts: monitoring_server
+  become: true
+  roles:
+    - alertmanager
+
+- name: "📋 Déploiement Loki"
+  hosts: monitoring_server
+  become: true
+  roles:
+    - loki
+
+- name: "📋 Déploiement Promtail"
+  hosts: monitored_servers
+  become: true
+  roles:
+    - promtail

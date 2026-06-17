@@ -1,0 +1,48 @@
+# Gitleaks config — Nova Syndicate
+# Allowlist pour éviter les faux positifs sur les placeholders dans la doc
+
+title = "Gitleaks config - Nova Syndicate"
+
+[extend]
+# Hérite des règles par défaut de Gitleaks
+useDefault = true
+
+# === ALLOWLIST GLOBALE ===
+[allowlist]
+description = "Placeholders, exemples docs, et patterns inoffensifs"
+
+# Patterns à ignorer (faux positifs liés à notre doc)
+regexTarget = "match"
+regexes = [
+    # Nos placeholders de doc (déjà sanitisés)
+    '''<LAB_PASSWORD>''',
+    '''<DB_PASSWORD>''',
+    '''<EXPORTER_PASSWORD>''',
+    '''<WAZUH_ADMIN_PASSWORD_REDACTED>''',
+    '''<REDACTED>''',
+    '''<changeme>''',
+    '''<password>''',
+    '''ton\.email@example\.com''',
+    '''TON_EMAIL@example\.com''',
+    '''security@nova\.local''',
+    '''security@nova-syndicate\.local''',
+    # Exemples génériques dans la doc
+    '''[Pp]assword:\s*[Yy]our[Pp]assword[Hh]ere''',
+    '''secret[_-]?key[_-]?placeholder''',
+]
+
+# Chemins à exclure entièrement
+paths = [
+    # Documentation pure (markdown explicatif)
+    '''(?i)README\.md$''',
+    '''(?i)SECURITY\.md$''',
+    '''pitches_soutenance\.md$''',
+    '''script_demo_live\.md$''',
+    '''reprise.*\.md$''',
+    '''progress.*\.md$''',
+    '''canva_candidats.*\.md$''',
+    # Build artefacts
+    '''Build/.*''',
+    '''node_modules/.*''',
+    '''__pycache__/.*''',
+]

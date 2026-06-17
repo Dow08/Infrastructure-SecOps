@@ -1,0 +1,62 @@
+---
+# Playbook : Install Wazuh SIEM (all-in-one) sur Wazuh-01
+# Usage : ansible-playbook -i inventory.ini playbook_wazuh_server.yml
+# DurÃ©e estimÃ©e : 10-15 min (tÃ©lÃ©chargement + install des 3 composants)
+
+- name: Install Wazuh SIEM Server (Manager + Indexer + Dashboard)
+  hosts: siem
+  become: true
+  gather_facts: yes
+
+  vars:
+    wazuh_install_script_url: https://packages.wazuh.com/4.7/wazuh-install.sh
+    wazuh_install_path: /tmp/wazuh-install.sh
+
+  tasks:
+    - name: Update apt cache
+      apt:
+        update_cache: yes
+        cache_valid_time: 3600
+
+    - name: Install dependencies (curl, gnupg)
+      apt:
+        name:
+          - curl
+          - gnupg
+          - apt-transport-https
+        state: present
+
+    - name: Download Wazuh install script
+      get_url:
+        url: "{{ wazuh_install_script_url }}"
+        dest: "{{ wazuh_install_path }}"
+        mode: '0755'
+
+    - name: Check if Wazuh manager already installed
+      stat:
+        path: /var/ossec/bin/wazuh-control
+      register: wazuh_installed
+
+    - name: Run Wazuh all-in-one installer
+      command: bash {{ wazuh_install_path }} -a -i
+      when: not wazuh_installed.stat.exists
+      register: wazuh_install_output
+      changed_when: "'Installation finished' in wazuh_install_output.stdout or wazuh_install_output.rc == 0"
+
+    - name: Display admin credentials location
+      debug:
+        msg:
+          - "Wazuh installed. Credentials in : /var/log/wazuh-passwords.txt"
+          - "Dashboard URL : https://{{ ansible_host }}"
+
+    - name: Read admin password
+      shell: |
+        grep -A1 "username: 'admin'" /var/ossec/etc/wazuh-passwords.txt | tail -1 | awk '{print $2}' | tr -d "'"
+      register: admin_pwd
+      changed_when: false
+      failed_when: false
+
+    - name: Print admin password
+      debug:
+        var: admin_pwd.stdout
+

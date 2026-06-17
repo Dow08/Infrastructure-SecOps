@@ -1,0 +1,448 @@
+---
+# Playbook : node_exporter + promtail (+ specifiques DB-01) sur tous les hosts
+# Deploiement des agents d'observabilite (metriques systeme + logs)
+# Usage : ansible-playbook -i inventory.ini playbook_monitoring_agents.yml
+# Duree : 5-10 min
+
+# === PHASE 1 : node_exporter sur tous les hosts ===
+- name: Deploy node_exporter on all monitored hosts
+  hosts: monitored_hosts
+  become: true
+  gather_facts: yes
+
+  vars:
+    ne_user: node_exporter
+    ne_dir: /opt/node_exporter
+
+  tasks:
+    - name: Create node_exporter user
+      user:
+        name: "{{ ne_user }}"
+        system: yes
+        shell: /usr/sbin/nologin
+        create_home: no
+
+    - name: Create node_exporter directory
+      file:
+        path: "{{ ne_dir }}"
+        state: directory
+        owner: "{{ ne_user }}"
+        group: "{{ ne_user }}"
+        mode: '0755'
+
+    - name: Check if node_exporter installed
+      stat:
+        path: "{{ ne_dir }}/node_exporter"
+      register: ne_installed
+
+    - name: Download node_exporter
+      unarchive:
+        src: "https://github.com/prometheus/node_exporter/releases/download/v{{ node_exporter_version }}/node_exporter-{{ node_exporter_version }}.linux-amd64.tar.gz"
+        dest: /tmp
+        remote_src: yes
+      when: not ne_installed.stat.exists
+
+    - name: Install node_exporter binary
+      copy:
+        src: "/tmp/node_exporter-{{ node_exporter_version }}.linux-amd64/node_exporter"
+        dest: "{{ ne_dir }}/node_exporter"
+        remote_src: yes
+        owner: "{{ ne_user }}"
+        group: "{{ ne_user }}"
+        mode: '0755'
+      when: not ne_installed.stat.exists
+
+    - name: Create node_exporter systemd service
+      copy:
+        dest: /etc/systemd/system/node_exporter.service
+        content: |
+          [Unit]
+          Description=Prometheus Node Exporter
+          After=network-online.target
+
+          [Service]
+          User={{ ne_user }}
+          Group={{ ne_user }}
+          Type=simple
+          ExecStart={{ ne_dir }}/node_exporter \
+            --collector.systemd \
+            --collector.processes \
+            --web.listen-address=0.0.0.0:{{ node_exporter_port }}
+          Restart=on-failure
+
+          [Install]
+          WantedBy=multi-user.target
+
+    - name: Enable and start node_exporter
+      systemd:
+        name: node_exporter
+        daemon_reload: yes
+        enabled: yes
+        state: restarted
+
+# === PHASE 2 : promtail (forwarder logs vers Loki) ===
+- name: Deploy promtail on all monitored hosts
+  hosts: monitored_hosts
+  become: true
+
+  vars:
+    pt_user: promtail
+    pt_dir: /opt/promtail
+    pt_data: /var/lib/promtail
+
+  tasks:
+    - name: Create promtail user (needs to read /var/log)
+      user:
+        name: "{{ pt_user }}"
+        system: yes
+        shell: /usr/sbin/nologin
+        groups: adm,systemd-journal
+        append: yes
+        create_home: no
+
+    - name: Create promtail directories
+      file:
+        path: "{{ item }}"
+        state: directory
+        owner: "{{ pt_user }}"
+        group: "{{ pt_user }}"
+        mode: '0755'
+      loop:
+        - "{{ pt_dir }}"
+        - "{{ pt_data }}"
+        - /etc/promtail
+
+    - name: Check promtail installed
+      stat:
+        path: "{{ pt_dir }}/promtail"
+      register: pt_installed
+
+    - name: Install unzip
+      apt:
+        name: unzip
+        state: present
+      when: not pt_installed.stat.exists
+
+    - name: Download promtail
+      get_url:
+        url: "https://github.com/grafana/loki/releases/download/v{{ promtail_version }}/promtail-linux-amd64.zip"
+        dest: /tmp/promtail.zip
+        mode: '0644'
+      when: not pt_installed.stat.exists
+
+    - name: Extract promtail
+      unarchive:
+        src: /tmp/promtail.zip
+        dest: "{{ pt_dir }}"
+        remote_src: yes
+      when: not pt_installed.stat.exists
+
+    - name: Rename promtail binary
+      command: mv "{{ pt_dir }}/promtail-linux-amd64" "{{ pt_dir }}/promtail"
+      args:
+        creates: "{{ pt_dir }}/promtail"
+      when: not pt_installed.stat.exists
+
+    - name: Set promtail binary permissions
+      file:
+        path: "{{ pt_dir }}/promtail"
+        owner: "{{ pt_user }}"
+        group: "{{ pt_user }}"
+        mode: '0755'
+
+    - name: Deploy promtail configuration
+      copy:
+        dest: /etc/promtail/config.yml
+        content: |
+          # Promtail configuration - {{ inventory_hostname }}
+          server:
+            http_listen_port: 9080
+            grpc_listen_port: 0
+
+          positions:
+            filename: {{ pt_data }}/positions.yaml
+
+          clients:
+            - url: http://{{ monitoring_server_ip }}:{{ loki_port }}/loki/api/v1/push
+
+          scrape_configs:
+            # Logs systeme (syslog)
+            - job_name: system
+              static_configs:
+                - targets: [localhost]
+                  labels:
+                    job: varlogs
+                    host: {{ inventory_hostname }}
+                    __path__: /var/log/*.log
+
+            # Logs journald (systemd)
+            - job_name: journal
+              journal:
+                json: false
+                max_age: 12h
+                path: /var/log/journal
+                labels:
+                  job: systemd-journal
+                  host: {{ inventory_hostname }}
+              relabel_configs:
+                - source_labels: ['__journal__systemd_unit']
+                  target_label: unit
+
+            # Logs nginx (path inexistant sur hosts sans nginx, promtail ignore silencieusement)
+            - job_name: nginx
+              static_configs:
+                - targets: [localhost]
+                  labels:
+                    job: nginx
+                    host: {{ inventory_hostname }}
+                    __path__: /var/log/nginx/*.log
+
+            # Logs MariaDB (path inexistant sur hosts sans MariaDB)
+            - job_name: mariadb
+              static_configs:
+                - targets: [localhost]
+                  labels:
+                    job: mariadb
+                    host: {{ inventory_hostname }}
+                    __path__: /var/log/mysql/*.log
+
+            # Wazuh logs (path inexistant sur hosts sans Wazuh)
+            - job_name: wazuh
+              static_configs:
+                - targets: [localhost]
+                  labels:
+                    job: wazuh
+                    host: {{ inventory_hostname }}
+                    __path__: /var/ossec/logs/*.log
+        owner: "{{ pt_user }}"
+        group: "{{ pt_user }}"
+        mode: '0644'
+
+    - name: Create promtail systemd service
+      copy:
+        dest: /etc/systemd/system/promtail.service
+        content: |
+          [Unit]
+          Description=Promtail Log Forwarder
+          After=network-online.target
+
+          [Service]
+          User={{ pt_user }}
+          Group={{ pt_user }}
+          Type=simple
+          ExecStart={{ pt_dir }}/promtail -config.file=/etc/promtail/config.yml
+          Restart=on-failure
+
+          [Install]
+          WantedBy=multi-user.target
+
+    - name: Enable and start promtail
+      systemd:
+        name: promtail
+        daemon_reload: yes
+        enabled: yes
+        state: restarted
+
+# === PHASE 3 : mysqld_exporter sur DB-01 ===
+- name: Deploy mysqld_exporter on DB hosts
+  hosts: mariadb_hosts
+  become: true
+
+  vars:
+    me_user: mysqld_exporter
+    me_dir: /opt/mysqld_exporter
+
+  tasks:
+    - name: Create mysqld_exporter user
+      user:
+        name: "{{ me_user }}"
+        system: yes
+        shell: /usr/sbin/nologin
+        create_home: no
+
+    - name: Create mysqld_exporter directory
+      file:
+        path: "{{ me_dir }}"
+        state: directory
+        owner: "{{ me_user }}"
+        group: "{{ me_user }}"
+        mode: '0755'
+
+    - name: Check mysqld_exporter installed
+      stat:
+        path: "{{ me_dir }}/mysqld_exporter"
+      register: me_installed
+
+    - name: Download mysqld_exporter
+      unarchive:
+        src: "https://github.com/prometheus/mysqld_exporter/releases/download/v{{ mysqld_exporter_version }}/mysqld_exporter-{{ mysqld_exporter_version }}.linux-amd64.tar.gz"
+        dest: /tmp
+        remote_src: yes
+      when: not me_installed.stat.exists
+
+    - name: Install mysqld_exporter binary
+      copy:
+        src: "/tmp/mysqld_exporter-{{ mysqld_exporter_version }}.linux-amd64/mysqld_exporter"
+        dest: "{{ me_dir }}/mysqld_exporter"
+        remote_src: yes
+        owner: "{{ me_user }}"
+        group: "{{ me_user }}"
+        mode: '0755'
+      when: not me_installed.stat.exists
+
+    - name: Create MariaDB user for exporter
+      shell: |
+        mysql -e "CREATE USER IF NOT EXISTS 'exporter'@'localhost' IDENTIFIED BY '<EXPORTER_PASSWORD>' WITH MAX_USER_CONNECTIONS 3;"
+        mysql -e "GRANT PROCESS, REPLICATION CLIENT, SELECT ON *.* TO 'exporter'@'localhost';"
+        mysql -e "FLUSH PRIVILEGES;"
+      args:
+        executable: /bin/bash
+
+    - name: Create my.cnf for exporter
+      copy:
+        dest: /etc/.exporter.my.cnf
+        content: |
+          [client]
+          user=exporter
+          password=<EXPORTER_PASSWORD>
+          host=localhost
+        owner: "{{ me_user }}"
+        group: "{{ me_user }}"
+        mode: '0640'
+
+    - name: Create mysqld_exporter systemd service
+      copy:
+        dest: /etc/systemd/system/mysqld_exporter.service
+        content: |
+          [Unit]
+          Description=Prometheus MariaDB Exporter
+          After=network-online.target mariadb.service
+
+          [Service]
+          User={{ me_user }}
+          Group={{ me_user }}
+          Type=simple
+          ExecStart={{ me_dir }}/mysqld_exporter \
+            --config.my-cnf=/etc/.exporter.my.cnf \
+            --web.listen-address=0.0.0.0:{{ mysqld_exporter_port }}
+          Restart=on-failure
+
+          [Install]
+          WantedBy=multi-user.target
+
+    - name: Enable and start mysqld_exporter
+      systemd:
+        name: mysqld_exporter
+        daemon_reload: yes
+        enabled: yes
+        state: restarted
+
+# === PHASE 4 : nginx-prometheus-exporter sur DB-01 ===
+- name: Deploy nginx exporter on nginx hosts
+  hosts: nginx_hosts
+  become: true
+
+  vars:
+    nx_user: nginx_exporter
+    nx_dir: /opt/nginx_exporter
+
+  tasks:
+    - name: Enable nginx stub_status
+      copy:
+        dest: /etc/nginx/conf.d/stub_status.conf
+        content: |
+          server {
+            listen 127.0.0.1:8080;
+            location /nginx_status {
+              stub_status;
+              allow 127.0.0.1;
+              deny all;
+            }
+          }
+      notify: reload nginx
+
+    - name: Create nginx_exporter user
+      user:
+        name: "{{ nx_user }}"
+        system: yes
+        shell: /usr/sbin/nologin
+        create_home: no
+
+    - name: Create nginx_exporter directory
+      file:
+        path: "{{ nx_dir }}"
+        state: directory
+        owner: "{{ nx_user }}"
+        group: "{{ nx_user }}"
+        mode: '0755'
+
+    - name: Check nginx_exporter installed
+      stat:
+        path: "{{ nx_dir }}/nginx-prometheus-exporter"
+      register: nx_installed
+
+    - name: Download nginx_exporter
+      unarchive:
+        src: "https://github.com/nginxinc/nginx-prometheus-exporter/releases/download/v{{ nginx_exporter_version }}/nginx-prometheus-exporter_{{ nginx_exporter_version }}_linux_amd64.tar.gz"
+        dest: "{{ nx_dir }}"
+        remote_src: yes
+        owner: "{{ nx_user }}"
+        group: "{{ nx_user }}"
+      when: not nx_installed.stat.exists
+
+    - name: Create nginx_exporter systemd service
+      copy:
+        dest: /etc/systemd/system/nginx_exporter.service
+        content: |
+          [Unit]
+          Description=NGINX Prometheus Exporter
+          After=network-online.target nginx.service
+
+          [Service]
+          User={{ nx_user }}
+          Group={{ nx_user }}
+          Type=simple
+          ExecStart={{ nx_dir }}/nginx-prometheus-exporter \
+            --nginx.scrape-uri=http://127.0.0.1:8080/nginx_status \
+            --web.listen-address=0.0.0.0:{{ nginx_exporter_port }}
+          Restart=on-failure
+
+          [Install]
+          WantedBy=multi-user.target
+
+    - name: Enable and start nginx_exporter
+      systemd:
+        name: nginx_exporter
+        daemon_reload: yes
+        enabled: yes
+        state: restarted
+
+  handlers:
+    - name: reload nginx
+      systemd:
+        name: nginx
+        state: reloaded
+
+# === PHASE 5 : Reload Prometheus pour decouvrir les targets ===
+- name: Reload Prometheus to discover new targets
+  hosts: observability_server
+  become: true
+  tasks:
+    - name: Trigger Prometheus config reload
+      uri:
+        url: "http://localhost:{{ prometheus_port }}/-/reload"
+        method: POST
+        status_code: 200
+      ignore_errors: yes
+
+    - name: Display final status
+      debug:
+        msg:
+          - "===== Agents observabilite deployes ====="
+          - "node_exporter   : http://{{ inventory_hostname }}:{{ node_exporter_port }}/metrics"
+          - "promtail        : forwarding to http://{{ monitoring_server_ip }}:{{ loki_port }}"
+          - "mysqld_exporter : http://10.1.10.30:{{ mysqld_exporter_port }}/metrics (DB-01)"
+          - "nginx_exporter  : http://10.1.10.30:{{ nginx_exporter_port }}/metrics (DB-01)"
+          - "Prometheus targets : http://{{ monitoring_server_ip }}:{{ prometheus_port }}/targets"
+          - "========================================"
+

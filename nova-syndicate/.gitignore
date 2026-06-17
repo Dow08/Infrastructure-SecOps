@@ -1,0 +1,48 @@
+# Sensitive
+*.key
+*.pem
+.ssh/
+*credentials*.txt
+*passwords*.txt
+.env
+
+# Binaires
+*.iso
+*.qcow2
+*.vmdk
+
+# Logs
+*.log
+*.log.*
+
+# Terraform state (sensitive)
+*.tfstate
+*.tfstate.*
+.terraform/
+
+# OS
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Editor
+.vscode/
+.idea/
+*.swp
+
+# Python / Node
+__pycache__/
+*.pyc
+node_modules/
+
+# Binaires lourds (GitHub limite 100MB)
+Build/image_iso/
+*.img
+*.iso
+*.qcow2
+*.qcow
+*.vmdk
+*.vdi
+*.ova
+*.ovf
+*.raw

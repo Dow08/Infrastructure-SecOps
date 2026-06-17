@@ -1,0 +1,12 @@
+# Fichiers temporaires Windows
+Thumbs.db
+Desktop.ini
+
+# Fichiers PowerShell locaux
+*.ps1_xml
+*.log
+transcript*.txt
+
+# Dossiers d'environnement virtuel ou IDE
+.vscode/
+.idea/

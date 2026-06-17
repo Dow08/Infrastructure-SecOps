@@ -1,0 +1,169 @@
+---
+# Playbook : Web-01 (nginx) + Proxy-01 (reverse proxy) + DB-01 (MariaDB)
+# Usage : ansible-playbook -i inventory.ini playbook_web_proxy_db.yml
+
+- name: Deploy MariaDB on DB-01
+  hosts: db01
+  become: true
+  vars:
+    db_name: novalab
+    db_user: novauser
+    db_password: <DB_PASSWORD>
+  tasks:
+    - name: Install MariaDB
+      apt:
+        name:
+          - mariadb-server
+          - python3-pymysql
+        state: present
+        update_cache: yes
+
+    - name: Configure bind-address to 0.0.0.0
+      lineinfile:
+        path: /etc/mysql/mariadb.conf.d/50-server.cnf
+        regexp: '^bind-address'
+        line: 'bind-address = 0.0.0.0'
+
+    - name: Restart MariaDB
+      systemd:
+        name: mariadb
+        state: restarted
+        enabled: yes
+
+    - name: Create database
+      mysql_db:
+        name: "{{ db_name }}"
+        state: present
+        login_unix_socket: /run/mysqld/mysqld.sock
+
+    - name: Create database user
+      mysql_user:
+        name: "{{ db_user }}"
+        password: "{{ db_password }}"
+        priv: "{{ db_name }}.*:ALL"
+        host: '%'
+        state: present
+        login_unix_socket: /run/mysqld/mysqld.sock
+
+- name: Deploy Nginx vitrine on Web-01
+  hosts: web01
+  become: true
+  tasks:
+    - name: Install nginx + mariadb-client
+      apt:
+        name:
+          - nginx
+          - mariadb-client
+        state: present
+        update_cache: yes
+
+    - name: Deploy index page
+      copy:
+        dest: /var/www/html/index.html
+        content: |
+          <!DOCTYPE html>
+          <html lang="fr">
+          <head>
+            <meta charset="UTF-8">
+            <title>Nova Syndicate â€” Portail</title>
+            <style>
+              body { font-family: 'Segoe UI', sans-serif; background: #0d1117; color: #c9d1d9; margin: 0; padding: 4em; text-align: center; }
+              h1 { color: #58a6ff; }
+              .infra { display: inline-block; padding: 2em; border: 1px solid #30363d; border-radius: 8px; margin-top: 2em; }
+            </style>
+          </head>
+          <body>
+            <h1>Nova Syndicate — BricoPro</h1>
+            <p>Plateforme e-commerce — Infrastructure securisee</p>
+            <div class=”infra”>
+              <strong>Heberge sur Web-01 (DMZ 10.1.5.30)</strong><br>
+              Reverse proxy : Proxy-01 (10.1.5.10)<br>
+              Base de donnÃ©es : DB-01 (10.1.10.30)
+            </div>
+          </body>
+          </html>
+
+    - name: Restart nginx
+      systemd:
+        name: nginx
+        state: restarted
+        enabled: yes
+
+- name: Deploy Nginx reverse proxy on Proxy-01
+  hosts: proxy01
+  become: true
+  vars:
+    backend_web: 10.1.5.30
+  tasks:
+    - name: Install nginx
+      apt:
+        name: nginx
+        state: present
+        update_cache: yes
+
+    - name: Remove default site
+      file:
+        path: /etc/nginx/sites-enabled/default
+        state: absent
+
+    - name: Deploy reverse proxy config
+      copy:
+        dest: /etc/nginx/sites-available/proxy
+        content: |
+          server {
+              listen 80 default_server;
+              server_name _;
+
+              # Headers de sÃ©curitÃ©
+              add_header X-Frame-Options "SAMEORIGIN" always;
+              add_header X-Content-Type-Options "nosniff" always;
+              add_header X-XSS-Protection "1; mode=block" always;
+              add_header Referrer-Policy "no-referrer-when-downgrade" always;
+
+              # Log proxy
+              access_log /var/log/nginx/proxy_access.log;
+              error_log /var/log/nginx/proxy_error.log;
+
+              location / {
+                  proxy_pass http://{{ backend_web }};
+                  proxy_set_header Host $host;
+                  proxy_set_header X-Real-IP $remote_addr;
+                  proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+                  proxy_set_header X-Forwarded-Proto $scheme;
+                  proxy_connect_timeout 5s;
+                  proxy_read_timeout 30s;
+              }
+          }
+
+    - name: Enable proxy site
+      file:
+        src: /etc/nginx/sites-available/proxy
+        dest: /etc/nginx/sites-enabled/proxy
+        state: link
+
+    - name: Test nginx config
+      command: nginx -t
+      changed_when: false
+
+    - name: Restart nginx
+      systemd:
+        name: nginx
+        state: restarted
+        enabled: yes
+
+- name: Verify connectivity end-to-end
+  hosts: proxy01
+  become: false
+  tasks:
+    - name: Test reverse proxy serves Web-01 content
+      uri:
+        url: http://localhost
+        return_content: yes
+      register: page
+
+    - name: Verify content
+      assert:
+        that:
+          - "'Nova Syndicate' in page.content"
+        success_msg: "Reverse proxy OK â†’ Web-01 atteint"
+

@@ -1,0 +1,94 @@
+Code;Nom_controle;Theme;Applicable;Statut_implementation;Justification_inclusion_exclusion;Document_reference;Owner;Date_revue
+A.5.1;Politiques de securite de l'information;Organisationnel;Oui;Implemente;Document fondateur du SMSI;PSSI v2.1;RSSI;2026-06-30
+A.5.2;Roles et responsabilites en matiere de securite de l'information;Organisationnel;Oui;Implemente;Necessaire a la gouvernance;Matrice RACI GRC;RSSI;2026-06-30
+A.5.3;Separation des taches;Organisationnel;Oui;Partiel;Encore quelques zones a renforcer en dev;Procedure changement;DSI;2026-06-30
+A.5.4;Responsabilites de la direction;Organisationnel;Oui;Implemente;Engagement comite ISO 27001;PV revue direction;Direction;2026-06-30
+A.5.5;Relations avec les autorites;Organisationnel;Oui;Implemente;Procedure de notification CNIL/ANSSI;Procedure incident;RSSI;2026-06-30
+A.5.6;Relations avec les groupes d'interet specialises;Organisationnel;Oui;Implemente;Adhesion CLUSIF + CESIN;Liste adhesions;RSSI;2026-06-30
+A.5.7;Threat intelligence;Organisationnel;Oui;Planifie;Nouveau controle 2022 - veille a structurer;Procedure veille (en cours);RSSI;2026-06-30
+A.5.8;Securite de l'information dans la gestion de projet;Organisationnel;Oui;Partiel;A integrer dans methodologie projet;Cahier des charges modele;PMO;2026-06-30
+A.5.9;Inventaire des informations et autres actifs associes;Organisationnel;Oui;Implemente;CMDB en place;Outil CMDB;DSI;2026-06-30
+A.5.10;Utilisation acceptable des informations et autres actifs;Organisationnel;Oui;Implemente;Charte signee par tous les collaborateurs;Charte utilisateur v3;RH;2026-06-30
+A.5.11;Retour des actifs;Organisationnel;Oui;Implemente;Processus offboarding;Procedure offboarding;RH;2026-06-30
+A.5.12;Classification des informations;Organisationnel;Oui;Implemente;Schema 4 niveaux: public/interne/confidentiel/secret;Politique classification;RSSI;2026-06-30
+A.5.13;Etiquetage des informations;Organisationnel;Oui;Partiel;Automatise pour docs Office, manuel pour le reste;Politique classification;RSSI;2026-06-30
+A.5.14;Transfert d'informations;Organisationnel;Oui;Implemente;Chiffrement TLS + procedure transfert sensible;Procedure transfert info;DSI;2026-06-30
+A.5.15;Controle d'acces;Organisationnel;Oui;Implemente;Modele RBAC + revue trimestrielle;Politique acces;DSI;2026-06-30
+A.5.16;Gestion d'identite;Organisationnel;Oui;Implemente;IdP Azure AD + provisioning automatise;Politique IAM;DSI;2026-06-30
+A.5.17;Informations d'authentification;Organisationnel;Oui;Implemente;Politique mot de passe + MFA generalise;Politique authentification;DSI;2026-06-30
+A.5.18;Droits d'acces;Organisationnel;Oui;Implemente;Revue trimestrielle accent comptes privilegies;Procedure revue acces;RSSI;2026-06-30
+A.5.19;Securite de l'information dans les relations avec les fournisseurs;Organisationnel;Oui;Partiel;Politique a renforcer cote NIS2;Politique fournisseurs;Achats;2026-06-30
+A.5.20;Prise en compte de la securite dans les contrats fournisseurs;Organisationnel;Oui;Partiel;Clauses standard a actualiser NIS2/DORA;Modele contrat;Juridique;2026-06-30
+A.5.21;Gestion de la securite dans la chaine d'approvisionnement TIC;Organisationnel;Oui;Planifie;Nouveau controle 2022 - SBOM en projet;Procedure SCA (en cours);DevSecOps;2026-06-30
+A.5.22;Surveillance, revue et changement des services fournisseurs;Organisationnel;Oui;Partiel;A renforcer pour fournisseurs critiques;Procedure revue tiers;Achats + RSSI;2026-06-30
+A.5.23;Securite de l'information dans l'utilisation de services cloud;Organisationnel;Oui;Implemente;Politique cloud + classification SaaS;Politique cloud;DSI;2026-06-30
+A.5.24;Planification et preparation de la gestion des incidents;Organisationnel;Oui;Implemente;Plan IR + equipe CSIRT virtuelle;Plan IR v2;RSSI;2026-06-30
+A.5.25;Evaluation et decision sur les evenements de securite;Organisationnel;Oui;Implemente;Procedure triage SOC;Procedure SOC;SOC;2026-06-30
+A.5.26;Reponse aux incidents de securite;Organisationnel;Oui;Implemente;Playbooks IR pour top scenarios;Playbooks IR;SOC + RSSI;2026-06-30
+A.5.27;Apprentissage a partir des incidents;Organisationnel;Oui;Implemente;Post-mortem systematique;Procedure post-mortem;RSSI;2026-06-30
+A.5.28;Collecte des preuves;Organisationnel;Oui;Implemente;Procedure forensique + chain of custody;Procedure forensic;SOC;2026-06-30
+A.5.29;Securite de l'information en cas de perturbation;Organisationnel;Oui;Implemente;Integre PCA;PCA;DSI;2026-06-30
+A.5.30;Preparation des TIC pour la continuite d'activite;Organisationnel;Oui;Partiel;Nouveau controle 2022 - tests PRA a planifier;PRA (test pending);DSI;2026-06-30
+A.5.31;Exigences legales statutaires reglementaires et contractuelles;Organisationnel;Oui;Implemente;Veille reglementaire DPO + RSSI;Registre conformite;Juridique + DPO;2026-06-30
+A.5.32;Droits de propriete intellectuelle;Organisationnel;Oui;Implemente;Politique IP + licences logicielles tracees;Politique IP;Juridique;2026-06-30
+A.5.33;Protection des enregistrements;Organisationnel;Oui;Implemente;Politique de conservation + archivage;Politique archivage;DSI;2026-06-30
+A.5.34;Confidentialite et protection des donnees personnelles;Organisationnel;Oui;Implemente;Registre traitements RGPD + procedures droits;Documentation RGPD;DPO;2026-06-30
+A.5.35;Revue independante de la securite de l'information;Organisationnel;Oui;Implemente;Audit interne annuel + pre-audit externe;Plan audit;RSSI;2026-06-30
+A.5.36;Conformite aux politiques regles et normes;Organisationnel;Oui;Implemente;Controles trimestriels;Plan controles;RSSI;2026-06-30
+A.5.37;Procedures d'exploitation documentees;Organisationnel;Oui;Implemente;Wiki technique + runbooks;Wiki SecOps;DSI;2026-06-30
+A.6.1;Selection de personnel;Personnel;Oui;Implemente;Verifications references pour postes sensibles;Procedure recrutement;RH;2026-06-30
+A.6.2;Termes et conditions d'emploi;Personnel;Oui;Implemente;Clauses confidentialite + securite contrat;Modele contrat;RH;2026-06-30
+A.6.3;Sensibilisation, education et formation a la securite de l'information;Personnel;Oui;Implemente;Programme annuel + phishing simulation;Plan formation cyber;RSSI;2026-06-30
+A.6.4;Processus disciplinaire;Personnel;Oui;Implemente;Procedure sanctions documentee RGPD-compliant;Procedure disciplinaire;RH;2026-06-30
+A.6.5;Responsabilites apres la fin ou le changement d'emploi;Personnel;Oui;Implemente;Procedure offboarding stricte;Procedure offboarding;RH + DSI;2026-06-30
+A.6.6;Accords de confidentialite ou de non-divulgation;Personnel;Oui;Implemente;NDA standard signe;Modele NDA;Juridique;2026-06-30
+A.6.7;Travail a distance;Personnel;Oui;Implemente;Politique teletravail + VPN obligatoire;Politique teletravail;RH + DSI;2026-06-30
+A.6.8;Signalement des evenements de securite de l'information;Personnel;Oui;Implemente;Canal de signalement + protection lanceurs alerte;Procedure signalement;RSSI;2026-06-30
+A.7.1;Perimetres de securite physique;Physique;Oui;Implemente;Acces par badge + zones controlees;Plan securite physique;Services generaux;2026-06-30
+A.7.2;Acces physique;Physique;Oui;Implemente;Badges + log acces;Procedure acces physique;Services generaux;2026-06-30
+A.7.3;Securisation des bureaux salles et installations;Physique;Oui;Implemente;Salle serveur securisee classe DC Tier III;Plan locaux;Services generaux;2026-06-30
+A.7.4;Surveillance de la securite physique;Physique;Oui;Implemente;Nouveau 2022 - videosurveillance + capteurs;Plan surveillance;Services generaux;2026-06-30
+A.7.5;Protection contre les menaces physiques et environnementales;Physique;Oui;Implemente;Detection incendie + climatisation redondee;Plan locaux;Services generaux;2026-06-30
+A.7.6;Travail dans les zones securisees;Physique;Oui;Implemente;Procedure zones sensibles;Procedure zones;Services generaux;2026-06-30
+A.7.7;Bureau propre et ecran verrouille;Physique;Oui;Implemente;Politique clean desk + verrouillage auto 10 min;Politique clean desk;RSSI;2026-06-30
+A.7.8;Emplacement et protection du materiel;Physique;Oui;Implemente;Hardening physique salle serveur;Plan locaux;DSI;2026-06-30
+A.7.9;Securite des biens hors site;Physique;Oui;Implemente;Chiffrement laptops + procedure perte/vol;Politique mobile;DSI;2026-06-30
+A.7.10;Supports de stockage;Physique;Oui;Implemente;Procedure media + destruction certifiee;Procedure media;DSI;2026-06-30
+A.7.11;Services generaux;Physique;Oui;Implemente;UPS + groupe electrogene + climatisation;Plan locaux;Services generaux;2026-06-30
+A.7.12;Securite du cablage;Physique;Oui;Implemente;Chemins de cables proteges + etiquetage;Plan cablage;DSI;2026-06-30
+A.7.13;Maintenance du materiel;Physique;Oui;Implemente;Contrats maintenance + supervision interventions;Contrats SLA;DSI;2026-06-30
+A.7.14;Elimination ou reutilisation securisees du materiel;Physique;Oui;Implemente;Effacement DoD + destruction certifiee;Procedure DEEE;DSI;2026-06-30
+A.8.1;Equipement terminal utilisateur;Technologique;Oui;Implemente;MDM + chiffrement + EDR;Politique endpoint;DSI;2026-06-30
+A.8.2;Droits d'acces privilegies;Technologique;Oui;Implemente;PAM + comptes d'admin separes;Politique PAM;DSI;2026-06-30
+A.8.3;Restriction d'acces a l'information;Technologique;Oui;Implemente;DLP + classification + restriction par role;Politique DLP;RSSI;2026-06-30
+A.8.4;Acces au code source;Technologique;Oui;Implemente;Repos prives + revue de code obligatoire;Politique SCM;DevSecOps;2026-06-30
+A.8.5;Authentification securisee;Technologique;Oui;Implemente;MFA generalise + politique mdp robuste;Politique authentification;DSI;2026-06-30
+A.8.6;Gestion de la capacite;Technologique;Oui;Implemente;Capacity planning + monitoring;Plan capacite;DSI;2026-06-30
+A.8.7;Protection contre les logiciels malveillants;Technologique;Oui;Implemente;EDR + filtrage email + sensibilisation;Politique malware;RSSI;2026-06-30
+A.8.8;Gestion des vulnerabilites techniques;Technologique;Oui;Implemente;Scanner Tenable + SLA patch CVSS-based;Procedure vulnerabilite;DSI;2026-06-30
+A.8.9;Gestion de la configuration;Technologique;Oui;Partiel;Nouveau 2022 - hardening CIS partiel;Procedure hardening;DSI;2026-06-30
+A.8.10;Suppression d'information;Technologique;Oui;Implemente;Nouveau 2022 - politique retention + purge auto;Politique retention;DPO + DSI;2026-06-30
+A.8.11;Masquage de donnees;Technologique;Oui;Partiel;Nouveau 2022 - pseudonymisation en environnement test;Procedure dev;DevSecOps;2026-06-30
+A.8.12;Prevention des fuites de donnees;Technologique;Oui;Partiel;Nouveau 2022 - DLP email + endpoint;Politique DLP;RSSI;2026-06-30
+A.8.13;Sauvegarde des informations;Technologique;Oui;Implemente;Sauvegardes 3-2-1 + test restauration mensuel;Politique backup;DSI;2026-06-30
+A.8.14;Redondance des installations de traitement;Technologique;Oui;Implemente;Datacenter actif-passif;Plan resilience;DSI;2026-06-30
+A.8.15;Journalisation;Technologique;Oui;Implemente;Logs centralises SIEM + retention 1 an;Politique log;SOC;2026-06-30
+A.8.16;Activites de surveillance;Technologique;Oui;Implemente;Nouveau 2022 - SOC 24/7 + cas d'usage SIEM;Procedure SOC;SOC;2026-06-30
+A.8.17;Synchronisation des horloges;Technologique;Oui;Implemente;NTP avec sources fiables;Procedure NTP;DSI;2026-06-30
+A.8.18;Utilisation de programmes utilitaires privilegies;Technologique;Oui;Implemente;Inventaire + acces controle;Procedure outils admin;DSI;2026-06-30
+A.8.19;Installation de logiciels sur les systemes en exploitation;Technologique;Oui;Implemente;Politique listes blanches + revue;Politique logiciels;DSI;2026-06-30
+A.8.20;Securite des reseaux;Technologique;Oui;Implemente;Segmentation + firewall + IDS;Architecture reseau;DSI;2026-06-30
+A.8.21;Securite des services reseau;Technologique;Oui;Implemente;SLA fournisseurs + supervision;Contrats reseau;DSI;2026-06-30
+A.8.22;Separation des reseaux;Technologique;Oui;Implemente;VLAN + zones DMZ/internal/sensible;Plan VLAN;DSI;2026-06-30
+A.8.23;Filtrage des sites web;Technologique;Oui;Implemente;Nouveau 2022 - proxy + DNS filtering;Politique navigation;DSI;2026-06-30
+A.8.24;Utilisation de la cryptographie;Technologique;Oui;Implemente;Standards crypto + KMS;Politique crypto;RSSI;2026-06-30
+A.8.25;Cycle de vie de developpement securise;Technologique;Oui;Implemente;SDLC + threat modeling;Politique SDLC;DevSecOps;2026-06-30
+A.8.26;Exigences de securite des applications;Technologique;Oui;Implemente;OWASP ASVS niveau 2;Standard ASVS;DevSecOps;2026-06-30
+A.8.27;Principes d'architecture et d'ingenierie de systemes securises;Technologique;Oui;Implemente;Reference architecture + revue;Reference archi;Architecture;2026-06-30
+A.8.28;Codage securise;Technologique;Oui;Partiel;Nouveau 2022 - formation OWASP + SAST partiel;Plan formation dev;DevSecOps;2026-06-30
+A.8.29;Tests de securite dans le developpement et l'acceptation;Technologique;Oui;Implemente;SAST + DAST + pentest annuel;Procedure tests securite;DevSecOps;2026-06-30
+A.8.30;Developpement externalise;Technologique;Oui;Implemente;Clauses + audits prestataires dev;Politique dev externe;Achats + DevSecOps;2026-06-30
+A.8.31;Separation des environnements de developpement, de test et de production;Technologique;Oui;Implemente;3 environnements isoles + pas de donnees reelles en pre-prod;Procedure environnements;DevSecOps;2026-06-30
+A.8.32;Gestion des changements;Technologique;Oui;Implemente;ITIL change management + CAB;Procedure changement;DSI;2026-06-30
+A.8.33;Information de test;Technologique;Oui;Implemente;Donnees pseudonymisees uniquement;Politique donnees test;DevSecOps;2026-06-30
+A.8.34;Protection des systemes d'information durant les tests d'audit;Technologique;Oui;Implemente;Procedure audit avec NDA + isolation;Procedure audit technique;RSSI;2026-06-30

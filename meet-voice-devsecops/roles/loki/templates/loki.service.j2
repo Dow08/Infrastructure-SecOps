@@ -1,0 +1,17 @@
+[Unit]
+Description=Loki v{{ loki_version }}
+Documentation=https://grafana.com/docs/loki/
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+User={{ loki_user }}
+Group={{ loki_group }}
+Type=simple
+Restart=on-failure
+RestartSec=5s
+ExecStart=/usr/local/bin/loki \
+  --config.file={{ loki_config_dir }}/loki-config.yml
+
+[Install]
+WantedBy=multi-user.target

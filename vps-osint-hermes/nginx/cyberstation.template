@@ -1,0 +1,136 @@
+# --- 1. PORTAIL HUB PRINCIPAL ({{HUB_DOMAIN}}) ---
+server {
+    server_name {{HUB_DOMAIN}} www.{{HUB_DOMAIN}};
+
+    root /var/www/hub;
+    index index.html;
+
+    add_header X-Frame-Options "SAMEORIGIN" always;
+    add_header X-Content-Type-Options "nosniff" always;
+    add_header X-XSS-Protection "1; mode=block" always;
+    add_header Referrer-Policy "strict-origin-when-cross-origin" always;
+
+    location / {
+        try_files $uri $uri/ =404;
+    }
+
+    location /.well-known/acme-challenge/ {
+        root /var/www/hub;
+        allow all;
+    }
+
+    listen 443 ssl;
+    ssl_certificate /etc/letsencrypt/live/{{HUB_DOMAIN}}/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/{{HUB_DOMAIN}}/privkey.pem;
+    include /etc/letsencrypt/options-ssl-nginx.conf;
+    ssl_dhparam /etc/letsencrypt/ssl-dhparams.pem;
+}
+
+# --- 2. HERMES WORKSPACE & API ({{HERMES_DOMAIN}}) ---
+server {
+    server_name {{HERMES_DOMAIN}} www.{{HERMES_DOMAIN}};
+
+    auth_basic "Acces Restreint - Hermes Workspace";
+    auth_basic_user_file /etc/nginx/.htpasswd_hermes;
+
+    add_header X-Frame-Options "SAMEORIGIN" always;
+    add_header X-Content-Type-Options "nosniff" always;
+    add_header X-XSS-Protection "1; mode=block" always;
+    add_header Referrer-Policy "strict-origin-when-cross-origin" always;
+
+    location / {
+        proxy_pass http://127.0.0.1:3000;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection "upgrade";
+        proxy_set_header Host 127.0.0.1:3000;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+
+    location /.well-known/acme-challenge/ {
+        auth_basic off;
+        root /var/www/hub;
+        allow all;
+    }
+
+    listen 443 ssl;
+    ssl_certificate /etc/letsencrypt/live/{{HUB_DOMAIN}}/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/{{HUB_DOMAIN}}/privkey.pem;
+    include /etc/letsencrypt/options-ssl-nginx.conf;
+    ssl_dhparam /etc/letsencrypt/ssl-dhparams.pem;
+}
+
+# --- 3. SHADOWBROKER ({{SHADOWBROKER_DOMAIN}}) ---
+server {
+    server_name {{SHADOWBROKER_DOMAIN}} www.{{SHADOWBROKER_DOMAIN}};
+
+    auth_basic "Acces Restreint - Shadowbroker";
+    auth_basic_user_file /etc/nginx/.htpasswd_hermes;
+
+    add_header X-Frame-Options "SAMEORIGIN" always;
+    add_header X-Content-Type-Options "nosniff" always;
+    add_header X-XSS-Protection "1; mode=block" always;
+    add_header Referrer-Policy "strict-origin-when-cross-origin" always;
+
+    location / {
+        proxy_pass http://127.0.0.1:8080;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection "upgrade";
+        proxy_set_header Host 127.0.0.1:8080;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+
+    location /.well-known/acme-challenge/ {
+        auth_basic off;
+        root /var/www/hub;
+        allow all;
+    }
+
+    listen 443 ssl;
+    ssl_certificate /etc/letsencrypt/live/{{HUB_DOMAIN}}/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/{{HUB_DOMAIN}}/privkey.pem;
+    include /etc/letsencrypt/options-ssl-nginx.conf;
+    ssl_dhparam /etc/letsencrypt/ssl-dhparams.pem;
+}
+
+# --- 4. REDIRECTIONS HTTP VERS HTTPS ---
+server {
+    if ($host = www.{{HUB_DOMAIN}}) {
+        return 301 https://$host$request_uri;
+    }
+    if ($host = {{HUB_DOMAIN}}) {
+        return 301 https://$host$request_uri;
+    }
+    listen 80;
+    server_name {{HUB_DOMAIN}} www.{{HUB_DOMAIN}};
+    return 404;
+}
+
+server {
+    if ($host = www.{{HERMES_DOMAIN}}) {
+        return 301 https://$host$request_uri;
+    }
+    if ($host = {{HERMES_DOMAIN}}) {
+        return 301 https://$host$request_uri;
+    }
+    listen 80;
+    server_name {{HERMES_DOMAIN}} www.{{HERMES_DOMAIN}};
+    return 404;
+}
+
+server {
+    if ($host = www.{{SHADOWBROKER_DOMAIN}}) {
+        return 301 https://$host$request_uri;
+    }
+    if ($host = {{SHADOWBROKER_DOMAIN}}) {
+        return 301 https://$host$request_uri;
+    }
+    listen 80;
+    server_name {{SHADOWBROKER_DOMAIN}} www.{{SHADOWBROKER_DOMAIN}};
+    return 404;
+}

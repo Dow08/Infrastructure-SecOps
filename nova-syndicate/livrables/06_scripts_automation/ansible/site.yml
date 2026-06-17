@@ -1,0 +1,19 @@
+---
+# Master playbook - Nova Syndicate
+# Joue tous les playbooks dans le bon ordre
+# Usage : ansible-playbook -i inventory.ini site.yml
+# Duree totale : 30-45 min
+
+- import_playbook: playbook_hardening.yml
+- import_playbook: playbook_monitoring_server.yml
+- import_playbook: playbook_monitoring_agents.yml
+- import_playbook: playbook_grafana_dashboards.yml
+
+# Note : playbook_wazuh_server.yml et playbook_wazuh_agents.yml sont volontairement
+# exclus car Wazuh deja deploye sur File-01 + agents sur DC01/DB-01.
+# Si redeploiement complet from scratch souhaite, decommenter ci-dessous :
+#
+# - import_playbook: playbook_wazuh_server.yml
+# - import_playbook: playbook_wazuh_agents.yml
+# - import_playbook: playbook_web_proxy_db.yml
+

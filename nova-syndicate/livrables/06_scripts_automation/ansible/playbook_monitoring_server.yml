@@ -1,0 +1,406 @@
+---
+# Playbook : Prometheus + Loki + Grafana sur File-01
+# Stack observabilitÃ© complete : metriques + logs + visualisation
+# Usage : ansible-playbook -i inventory.ini playbook_monitoring_server.yml
+# Duree : 10-15 min
+
+- name: Deploy Prometheus + Loki + Grafana stack on monitoring server
+  hosts: observability_server
+  become: true
+  gather_facts: yes
+
+  vars:
+    prometheus_user: prometheus
+    prometheus_dir: /opt/prometheus
+    prometheus_data: /var/lib/prometheus
+    loki_user: loki
+    loki_dir: /opt/loki
+    loki_data: /var/lib/loki
+
+  tasks:
+    # === SYSTEM PREP ===
+    - name: Install required packages
+      apt:
+        name:
+          - curl
+          - wget
+          - tar
+          - apt-transport-https
+          - software-properties-common
+          - gnupg2
+        state: present
+        update_cache: yes
+
+    # === PROMETHEUS ===
+    - name: Create prometheus user
+      user:
+        name: "{{ prometheus_user }}"
+        system: yes
+        shell: /usr/sbin/nologin
+        home: "{{ prometheus_data }}"
+        create_home: no
+
+    - name: Create prometheus directories
+      file:
+        path: "{{ item }}"
+        state: directory
+        owner: "{{ prometheus_user }}"
+        group: "{{ prometheus_user }}"
+        mode: '0755'
+      loop:
+        - "{{ prometheus_dir }}"
+        - "{{ prometheus_data }}"
+        - /etc/prometheus
+
+    - name: Check if Prometheus already installed
+      stat:
+        path: "{{ prometheus_dir }}/prometheus"
+      register: prometheus_installed
+
+    - name: Download Prometheus
+      unarchive:
+        src: "https://github.com/prometheus/prometheus/releases/download/v{{ prometheus_version }}/prometheus-{{ prometheus_version }}.linux-amd64.tar.gz"
+        dest: /tmp
+        remote_src: yes
+      when: not prometheus_installed.stat.exists
+
+    - name: Install Prometheus binaries
+      copy:
+        src: "/tmp/prometheus-{{ prometheus_version }}.linux-amd64/{{ item }}"
+        dest: "{{ prometheus_dir }}/{{ item }}"
+        remote_src: yes
+        owner: "{{ prometheus_user }}"
+        group: "{{ prometheus_user }}"
+        mode: '0755'
+      loop:
+        - prometheus
+        - promtool
+      when: not prometheus_installed.stat.exists
+
+    - name: Copy Prometheus consoles + libraries
+      copy:
+        src: "/tmp/prometheus-{{ prometheus_version }}.linux-amd64/{{ item }}"
+        dest: "/etc/prometheus/{{ item }}"
+        remote_src: yes
+        owner: "{{ prometheus_user }}"
+        group: "{{ prometheus_user }}"
+      loop:
+        - consoles
+        - console_libraries
+      when: not prometheus_installed.stat.exists
+
+    - name: Deploy Prometheus configuration
+      copy:
+        dest: /etc/prometheus/prometheus.yml
+        content: |
+          # Prometheus configuration - Nova Syndicate
+          global:
+            scrape_interval: 15s
+            evaluation_interval: 15s
+            external_labels:
+              monitor: 'nova-syndicate'
+
+          scrape_configs:
+            - job_name: 'prometheus'
+              static_configs:
+                - targets: ['localhost:9090']
+
+            - job_name: 'node_exporter'
+              static_configs:
+                - targets:
+                    - '10.1.10.10:9100'  # DC01-Lyon
+                    - '10.1.10.30:9100'  # DB-01
+                    - '10.1.10.40:9100'  # File-01
+                  labels:
+                    site: 'lyon'
+
+            - job_name: 'mysqld_exporter'
+              static_configs:
+                - targets: ['10.1.10.30:9104']
+                  labels:
+                    service: 'mariadb'
+                    host: 'db01'
+
+            - job_name: 'nginx_exporter'
+              static_configs:
+                - targets: ['10.1.10.30:9113']
+                  labels:
+                    service: 'nginx'
+                    host: 'db01'
+
+            - job_name: 'wazuh_manager'
+              static_configs:
+                - targets: ['10.1.10.40:55000']
+                  labels:
+                    service: 'wazuh'
+        owner: "{{ prometheus_user }}"
+        group: "{{ prometheus_user }}"
+        mode: '0644'
+
+    - name: Create Prometheus systemd service
+      copy:
+        dest: /etc/systemd/system/prometheus.service
+        content: |
+          [Unit]
+          Description=Prometheus Server
+          Documentation=https://prometheus.io/docs/introduction/overview/
+          After=network-online.target
+
+          [Service]
+          User={{ prometheus_user }}
+          Group={{ prometheus_user }}
+          Type=simple
+          ExecStart={{ prometheus_dir }}/prometheus \
+            --config.file=/etc/prometheus/prometheus.yml \
+            --storage.tsdb.path={{ prometheus_data }} \
+            --web.console.templates=/etc/prometheus/consoles \
+            --web.console.libraries=/etc/prometheus/console_libraries \
+            --web.listen-address=0.0.0.0:9090 \
+            --storage.tsdb.retention.time=30d
+          Restart=on-failure
+
+          [Install]
+          WantedBy=multi-user.target
+
+    - name: Enable and start Prometheus
+      systemd:
+        name: prometheus
+        daemon_reload: yes
+        enabled: yes
+        state: restarted
+
+    # === LOKI ===
+    - name: Create loki user
+      user:
+        name: "{{ loki_user }}"
+        system: yes
+        shell: /usr/sbin/nologin
+        home: "{{ loki_data }}"
+        create_home: no
+
+    - name: Create Loki directories
+      file:
+        path: "{{ item }}"
+        state: directory
+        owner: "{{ loki_user }}"
+        group: "{{ loki_user }}"
+        mode: '0755'
+      loop:
+        - "{{ loki_dir }}"
+        - "{{ loki_data }}"
+        - "{{ loki_data }}/chunks"
+        - "{{ loki_data }}/rules"
+        - "{{ loki_data }}/wal"
+        - "{{ loki_data }}/compactor"
+        - /etc/loki
+
+    - name: Check if Loki already installed
+      stat:
+        path: "{{ loki_dir }}/loki"
+      register: loki_installed
+
+    - name: Download Loki binary
+      get_url:
+        url: "https://github.com/grafana/loki/releases/download/v{{ loki_version }}/loki-linux-amd64.zip"
+        dest: /tmp/loki.zip
+        mode: '0644'
+      when: not loki_installed.stat.exists
+
+    - name: Install unzip
+      apt:
+        name: unzip
+        state: present
+      when: not loki_installed.stat.exists
+
+    - name: Extract Loki binary
+      unarchive:
+        src: /tmp/loki.zip
+        dest: "{{ loki_dir }}"
+        remote_src: yes
+      when: not loki_installed.stat.exists
+
+    - name: Rename Loki binary
+      command: mv "{{ loki_dir }}/loki-linux-amd64" "{{ loki_dir }}/loki"
+      args:
+        creates: "{{ loki_dir }}/loki"
+      when: not loki_installed.stat.exists
+
+    - name: Set Loki binary permissions
+      file:
+        path: "{{ loki_dir }}/loki"
+        owner: "{{ loki_user }}"
+        group: "{{ loki_user }}"
+        mode: '0755'
+
+    - name: Deploy Loki configuration
+      copy:
+        dest: /etc/loki/config.yml
+        content: |
+          # Loki configuration - Nova Syndicate
+          auth_enabled: false
+
+          server:
+            http_listen_port: {{ loki_port }}
+            grpc_listen_port: 9095
+
+          common:
+            instance_addr: 127.0.0.1
+            path_prefix: {{ loki_data }}
+            storage:
+              filesystem:
+                chunks_directory: {{ loki_data }}/chunks
+                rules_directory: {{ loki_data }}/rules
+            replication_factor: 1
+            ring:
+              kvstore:
+                store: inmemory
+
+          query_range:
+            results_cache:
+              cache:
+                embedded_cache:
+                  enabled: true
+                  max_size_mb: 100
+
+          schema_config:
+            configs:
+              - from: 2024-01-01
+                store: tsdb
+                object_store: filesystem
+                schema: v13
+                index:
+                  prefix: index_
+                  period: 24h
+
+          ruler:
+            alertmanager_url: http://localhost:9093
+
+          limits_config:
+            retention_period: 720h  # 30 jours
+            allow_structured_metadata: true
+            volume_enabled: true
+
+          analytics:
+            reporting_enabled: false
+        owner: "{{ loki_user }}"
+        group: "{{ loki_user }}"
+        mode: '0644'
+
+    - name: Create Loki systemd service
+      copy:
+        dest: /etc/systemd/system/loki.service
+        content: |
+          [Unit]
+          Description=Loki Log Aggregation
+          Documentation=https://grafana.com/docs/loki/
+          After=network-online.target
+
+          [Service]
+          User={{ loki_user }}
+          Group={{ loki_user }}
+          Type=simple
+          ExecStart={{ loki_dir }}/loki -config.file=/etc/loki/config.yml
+          Restart=on-failure
+
+          [Install]
+          WantedBy=multi-user.target
+
+    - name: Enable and start Loki
+      systemd:
+        name: loki
+        daemon_reload: yes
+        enabled: yes
+        state: restarted
+
+    # === GRAFANA ===
+    - name: Add Grafana GPG key
+      apt_key:
+        url: https://apt.grafana.com/gpg.key
+        state: present
+
+    - name: Add Grafana repository
+      apt_repository:
+        repo: "deb https://apt.grafana.com stable main"
+        state: present
+        filename: grafana
+
+    - name: Install Grafana
+      apt:
+        name: grafana
+        state: present
+        update_cache: yes
+
+    - name: Configure Grafana (allow listen all IPs)
+      lineinfile:
+        path: /etc/grafana/grafana.ini
+        regexp: '^;?http_addr ='
+        line: 'http_addr = 0.0.0.0'
+
+    - name: Enable and start Grafana
+      systemd:
+        name: grafana-server
+        daemon_reload: yes
+        enabled: yes
+        state: restarted
+
+    - name: Wait for Grafana API to be ready
+      uri:
+        url: "http://localhost:{{ grafana_port }}/api/health"
+        status_code: 200
+      register: grafana_health
+      until: grafana_health.status == 200
+      retries: 12
+      delay: 5
+
+    # === GRAFANA DATASOURCES ===
+    - name: Configure Prometheus datasource in Grafana
+      uri:
+        url: "http://localhost:{{ grafana_port }}/api/datasources"
+        method: POST
+        user: admin
+        password: admin
+        force_basic_auth: yes
+        body_format: json
+        body:
+          name: Prometheus
+          type: prometheus
+          access: proxy
+          url: "http://localhost:{{ prometheus_port }}"
+          isDefault: true
+        status_code: [200, 409]  # 409 if already exists
+
+    - name: Configure Loki datasource in Grafana
+      uri:
+        url: "http://localhost:{{ grafana_port }}/api/datasources"
+        method: POST
+        user: admin
+        password: admin
+        force_basic_auth: yes
+        body_format: json
+        body:
+          name: Loki
+          type: loki
+          access: proxy
+          url: "http://localhost:{{ loki_port }}"
+        status_code: [200, 409]
+
+    # === VERIFICATION ===
+    - name: Verify services running
+      command: systemctl is-active {{ item }}
+      register: service_status
+      changed_when: false
+      loop:
+        - prometheus
+        - loki
+        - grafana-server
+
+    - name: Display monitoring stack status
+      debug:
+        msg:
+          - "===== Monitoring stack deploye ====="
+          - "Prometheus  : http://{{ monitoring_server_ip }}:{{ prometheus_port }}"
+          - "Loki API    : http://{{ monitoring_server_ip }}:{{ loki_port }}"
+          - "Grafana     : http://{{ monitoring_server_ip }}:{{ grafana_port }}"
+          - "Grafana default login : admin / admin (changer au 1er login)"
+          - "===================================="
+

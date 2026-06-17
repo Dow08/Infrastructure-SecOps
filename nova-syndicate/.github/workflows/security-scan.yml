@@ -1,0 +1,140 @@
+name: 🛡️ Security Scan
+
+# Déclenchement : push, pull request, et hebdomadaire (lundi 6h UTC)
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  schedule:
+    - cron: '0 6 * * 1'  # Tous les lundis 6h UTC
+  workflow_dispatch:  # Permet déclenchement manuel
+
+permissions:
+  contents: read
+  security-events: write  # Pour upload SARIF dans Security tab
+  actions: read
+
+jobs:
+  # === TRIVY — Vulnérabilités OS + dépendances + secrets ===
+  trivy:
+    name: 🐳 Trivy — Vulns + Secrets + Misconfigs
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Run Trivy filesystem scan
+        uses: aquasecurity/trivy-action@master
+        with:
+          scan-type: 'fs'
+          scan-ref: '.'
+          format: 'sarif'
+          output: 'trivy-results.sarif'
+          severity: 'CRITICAL,HIGH,MEDIUM'
+          ignore-unfixed: true
+          scanners: 'vuln,secret,misconfig'
+
+      - name: Upload Trivy results to GitHub Security
+        uses: github/codeql-action/upload-sarif@v4
+        if: always()
+        with:
+          sarif_file: 'trivy-results.sarif'
+          category: trivy
+
+      - name: Trivy table summary (visible dans logs)
+        uses: aquasecurity/trivy-action@master
+        with:
+          scan-type: 'fs'
+          scan-ref: '.'
+          format: 'table'
+          severity: 'CRITICAL,HIGH'
+          exit-code: '0'  # Ne bloque pas le pipeline
+
+  # === CHECKOV — Misconfigurations IaC (Terraform + Ansible) ===
+  checkov:
+    name: 🏗️ Checkov — IaC Misconfigs
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Run Checkov action
+        id: checkov
+        uses: bridgecrewio/checkov-action@master
+        with:
+          directory: .
+          framework: terraform,ansible,github_actions,secrets
+          output_format: cli,sarif
+          output_file_path: console,checkov-results.sarif
+          soft_fail: true  # Ne bloque pas, mais reporte
+          quiet: true
+
+      - name: Upload Checkov results to GitHub Security
+        uses: github/codeql-action/upload-sarif@v4
+        if: always()
+        with:
+          sarif_file: checkov-results.sarif
+          category: checkov
+
+  # === ANSIBLE-LINT — Best practices Ansible ===
+  ansible-lint:
+    name: 🤖 Ansible Lint
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: '3.11'
+
+      - name: Install ansible-lint
+        run: |
+          pip install ansible ansible-lint
+
+      - name: Run ansible-lint
+        run: |
+          cd livrables/06_scripts_automation/ansible
+          ansible-lint --offline -p . || true
+        continue-on-error: true
+
+  # === GITLEAKS — Secrets dans l'historique Git ===
+  gitleaks:
+    name: 🔐 Gitleaks — Secret detection
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code (full history)
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # Important : tout l'historique git
+
+      - name: Run Gitleaks
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # Bloque le pipeline si secrets trouvés (sauf allowlist .gitleaks.toml)
+          GITLEAKS_ENABLE_COMMENTS: true
+          GITLEAKS_ENABLE_UPLOAD_ARTIFACT: true
+          GITLEAKS_ENABLE_SUMMARY: true
+
+  # === SUMMARY — Récap final dans la PR ===
+  summary:
+    name: 📋 Security Scan Summary
+    runs-on: ubuntu-latest
+    needs: [trivy, checkov, ansible-lint, gitleaks]
+    if: always()
+    steps:
+      - name: Print summary
+        run: |
+          echo "## 🛡️ Security Scan Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Outil | Statut |" >> $GITHUB_STEP_SUMMARY
+          echo "|-------|--------|" >> $GITHUB_STEP_SUMMARY
+          echo "| Trivy (CVE + secrets + misconfigs) | ${{ needs.trivy.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Checkov (IaC) | ${{ needs.checkov.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Ansible-lint | ${{ needs.ansible-lint.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Gitleaks | ${{ needs.gitleaks.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "📌 Détails complets dans l'onglet **Security** du repo." >> $GITHUB_STEP_SUMMARY

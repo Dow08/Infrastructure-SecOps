@@ -1,0 +1,48 @@
+name: CI/CD Security and Quality
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+
+jobs:
+  lint-ansible:
+    name: "Ansible Lint"
+    runs-on: ubuntu-latest
+    steps:
+      - name: "Checkout code"
+        uses: actions/checkout@v4
+
+      - name: "Set up Python"
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.1x'
+
+      - name: "Install Ansible & Ansible-Lint"
+        run: |
+          python -m pip install --upgrade pip
+          pip install ansible ansible-lint
+
+      - name: "Run Ansible Lint"
+        run: ansible-lint -q .
+
+  security-scan:
+    name: "Trivy Security Scan"
+    runs-on: ubuntu-latest
+    steps:
+      - name: "Checkout code"
+        uses: actions/checkout@v4
+
+      - name: "Run Trivy vulnerability scanner in fs mode"
+        uses: aquasecurity/trivy-action@master
+        with:
+          scan-type: 'fs'
+          scan-ref: '.'
+          format: 'table'
+          # Ignore les vulnérabilités non corrigées pour éviter trop de bruit au début
+          ignore-unfixed: true
+          # Affiche uniquement les vulnérabilités de haut niveau
+          severity: 'CRITICAL,HIGH'
+          # Scanne aussi les secrets et mauvaises configurations (IaC)
+          scanners: 'vuln,secret,config'

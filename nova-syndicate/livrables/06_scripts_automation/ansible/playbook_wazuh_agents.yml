@@ -1,0 +1,57 @@
+---
+# Playbook : Install Wazuh agents sur DC01, DB-01, File-01, Web-01, Proxy-01
+# Usage : ansible-playbook -i inventory.ini playbook_wazuh_agents.yml
+# PrÃ©-requis : wazuh-manager dÃ©jÃ  dÃ©ployÃ© sur wazuh01 (10.1.10.20)
+
+- name: Install Wazuh agents
+  hosts: dc:servers:dmz
+  become: true
+  gather_facts: yes
+
+  vars:
+    wazuh_manager_ip: 10.1.10.20
+    wazuh_agent_version: "4.7.5-1"
+
+  tasks:
+    - name: Add Wazuh GPG key
+      apt_key:
+        url: https://packages.wazuh.com/key/GPG-KEY-WAZUH
+        state: present
+
+    - name: Add Wazuh repository
+      apt_repository:
+        repo: "deb https://packages.wazuh.com/4.x/apt/ stable main"
+        state: present
+        filename: wazuh
+
+    - name: Install wazuh-agent
+      apt:
+        name: "wazuh-agent={{ wazuh_agent_version }}"
+        update_cache: yes
+        state: present
+      environment:
+        WAZUH_MANAGER: "{{ wazuh_manager_ip }}"
+
+    - name: Configure agent manager IP
+      lineinfile:
+        path: /var/ossec/etc/ossec.conf
+        regexp: '<address>.*</address>'
+        line: "      <address>{{ wazuh_manager_ip }}</address>"
+        backrefs: yes
+
+    - name: Enable and start wazuh-agent
+      systemd:
+        name: wazuh-agent
+        enabled: yes
+        state: restarted
+        daemon_reload: yes
+
+    - name: Display agent status
+      command: /var/ossec/bin/wazuh-control status
+      register: agent_status
+      changed_when: false
+
+    - name: Print agent status
+      debug:
+        var: agent_status.stdout_lines
+

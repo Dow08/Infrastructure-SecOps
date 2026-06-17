@@ -1,0 +1,17 @@
+[Unit]
+Description=Hermes UI Front-end
+After=network.target
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=/root/hermes-workspace
+Environment=NODE_OPTIONS="--max-old-space-size=2048"
+Environment=HERMES_API_URL=http://127.0.0.1:9119
+Environment=VITE_HERMES_API_URL=https://{{HERMES_DOMAIN}}/api
+ExecStart=/usr/bin/pnpm dev --host 127.0.0.1 --port 3000
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

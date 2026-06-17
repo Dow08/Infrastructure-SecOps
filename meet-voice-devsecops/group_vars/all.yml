@@ -1,0 +1,11 @@
+# Versions des outils
+node_exporter_version: "1.8.0"
+prometheus_version: "2.51.0"
+grafana_version: "10.4.0"
+loki_version: "2.9.0"
+
+# Ports
+node_exporter_port: 9100
+prometheus_port: 9090
+grafana_port: 3000
+alertmanager_port: 9093

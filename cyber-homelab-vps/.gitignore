@@ -1,0 +1,23 @@
+# Secrets & configuration sensible — NE JAMAIS COMMITTER
+.env
+*.env
+**/.env
+docker-compose*.yml
+*.htpasswd
+.htpasswd*
+*.key
+*.pem
+*.crt
+secrets/
+**/secrets/
+
+# Données d'investigation / exports
+*.dump
+*.sql
+exports/
+data/
+
+# Système
+.DS_Store
+Thumbs.db
+*.log

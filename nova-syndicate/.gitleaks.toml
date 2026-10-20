@@ -47,7 +47,6 @@ paths = [
     '''progress.*\.md$''',
     '''canva_candidats.*\.md$''',
     # Build artefacts
-    '''Build/.*''',
     '''node_modules/.*''',
     '''__pycache__/.*''',
 ]

@@ -1,0 +1,6 @@
+# Copier en terraform.tfvars (ignoré par git) et remplir.
+# Alternative : export TF_VAR_proxmox_api_token=... / TF_VAR_vm_password=...
+proxmox_endpoint  = "https://192.168.1.165:8006/"
+proxmox_node      = "pve"
+proxmox_api_token = "terraform@pve!tf=00000000-0000-0000-0000-000000000000"
+vm_password       = "<LAB_PASSWORD>"

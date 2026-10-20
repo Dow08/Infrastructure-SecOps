@@ -1,0 +1,10 @@
+# Terraform state (contient tokens + données sensibles)
+terraform.tfstate
+terraform.tfstate.backup
+.terraform/
+.terraform.lock.hcl
+*.tfvars
+
+# Binaire Terraform
+terraform.exe
+terraform

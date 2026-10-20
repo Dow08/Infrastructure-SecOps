@@ -182,14 +182,14 @@ def _start_ssh_tunnel(ssh_host, remote_host, remote_port, env_key, ssh_user=None
 
 PG_ARTICLE_NAME     = config('PG_ARTICLE_NAME',     default='meetvoice')
 PG_ARTICLE_USER     = config('PG_ARTICLE_USER',     default='meetvoice')
-PG_ARTICLE_PASSWORD = config('PG_ARTICLE_PASSWORD', default='<PG_ARTICLE_PASSWORD>')
+PG_ARTICLE_PASSWORD = config('PG_ARTICLE_PASSWORD')
 
 MONGO_GW_USER       = config('MONGO_GW_USER',       default='gateway_user')
-MONGO_GW_PASSWORD   = config('MONGO_GW_PASSWORD',   default='<MONGO_GW_PASSWORD>')
+MONGO_GW_PASSWORD   = config('MONGO_GW_PASSWORD')
 MONGO_API_USER      = config('MONGO_API_USER',       default='admin')
-MONGO_API_PASSWORD  = config('MONGO_API_PASSWORD',  default='<MONGO_API_PASSWORD>')
+MONGO_API_PASSWORD  = config('MONGO_API_PASSWORD')
 MONGO_EVENT_USER    = config('MONGO_EVENT_USER',     default='admin')
-MONGO_EVENT_PASSWORD= config('MONGO_EVENT_PASSWORD',default='<MONGO_EVENT_PASSWORD>')
+MONGO_EVENT_PASSWORD= config('MONGO_EVENT_PASSWORD')
 
 # ─────────────────────────────────────────────────────────────────────────────
 
@@ -230,7 +230,7 @@ for _key, _label, _host, _user in _NE_SERVERS:
         pass
 
 
-SECRET_KEY = config('SECRET_KEY', default='<DJANGO_SECRET_KEY>')
+SECRET_KEY = config('SECRET_KEY')
 DEBUG = config('DEBUG', default=True, cast=bool)
 ALLOWED_HOSTS = config('ALLOWED_HOSTS', default='localhost,127.0.0.1', cast=lambda v: [s.strip() for s in v.split(',')])
 

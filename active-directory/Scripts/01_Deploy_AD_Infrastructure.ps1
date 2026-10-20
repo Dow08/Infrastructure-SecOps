@@ -7,7 +7,9 @@ $CurrentDomain = (Get-ADDomain).DNSRoot
 $DomainDN = (Get-ADDomain).DistinguishedName
 $CSVPath = "$PSScriptRoot\utilisateurs.csv"
 $BaseOUName = "ENTREPRISE"
-$DefaultPassword = ConvertTo-SecureString "<AD_DEFAULT_PASSWORD>" -AsPlainText -Force
+# Mot de passe initial : variable d'environnement AD_DEFAULT_PASSWORD, sinon saisie interactive (jamais en dur dans le script)
+if ($env:AD_DEFAULT_PASSWORD) { $DefaultPassword = ConvertTo-SecureString $env:AD_DEFAULT_PASSWORD -AsPlainText -Force }
+else { $DefaultPassword = Read-Host "Mot de passe initial des comptes" -AsSecureString }
 
 Write-Host "[*] Démarrage du provisioning sur : $CurrentDomain" -ForegroundColor Cyan
 

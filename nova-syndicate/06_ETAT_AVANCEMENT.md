@@ -47,12 +47,9 @@ La topologie est validée. Les décisions techniques sont prises. On peut commen
 
 ---
 
-## Mot de passe standard du projet
+## Mots de passe du projet
 
-- Proxmox root : `<LAB_PASSWORD>`
-- VMs root : `<LAB_PASSWORD>`
-- AD Samba4 : `<AD_PASSWORD>` (sans caractères spéciaux pour les consoles AZERTY)
-- OPNsense admin : `<LAB_PASSWORD>`
+Les identifiants du lab (Proxmox, VMs, AD, OPNsense) ne sont **pas versionnés** : ils vivent dans un fichier local hors dépôt (`.env` / `terraform.tfvars`, ignorés par git) et dans le gestionnaire de mots de passe de l'opérateur. Les placeholders `<LAB_PASSWORD>` et `<AD_PASSWORD>` dans la documentation désignent ces valeurs.
 
 ---
 
